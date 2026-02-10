@@ -797,6 +797,37 @@
         const statusSubtext = document.getElementById('status-subtext');
         const timerDisplay = document.getElementById('timer-display');
         
+        // ============================================
+        // TIMER FUNCTIONS - FIXED
+        // ============================================
+        function startTimer() {
+            // Clear any existing timer first
+            stopTimer();
+            
+            let seconds = 0;
+            timerDisplay.textContent = '00:00';
+            
+            AppState.timerInterval = setInterval(() => {
+                seconds++;
+                timerDisplay.textContent = formatDuration(seconds);
+                
+                // Auto-complete after 5 minutes (300 seconds)
+                if (seconds >= 300) {
+                    markCallComplete();
+                }
+            }, 1000);
+        }
+        
+        function stopTimer() {
+            if (AppState.timerInterval) {
+                clearInterval(AppState.timerInterval);
+                AppState.timerInterval = null;
+            }
+        }
+        
+        // ============================================
+        // STATUS UPDATE - FIXED TO STOP TIMER
+        // ============================================
         function updateStatus(state, message, subtext = '') {
             AppState.callStatus = state;
             statusDisplay.classList.remove('hidden');
@@ -828,52 +859,41 @@
                     timerDisplay.classList.remove('hidden');
                     // Change button to "Mark Complete"
                     startCallBtn.innerHTML = '<span>✓</span><span>Mark Complete</span>';
-                    startCallBtn.onclick = markCallComplete;
+                    startCallBtn.onclick = (e) => {
+                        e.preventDefault();
+                        markCallComplete();
+                    };
                     startCallBtn.disabled = false;
                     break;
                     
                 case 'completed':
+                    stopTimer(); // FIXED: Stop timer when completed
+                    statusIcon.classList.remove('status-pulse');
                     statusIcon.classList.add('bg-green-100');
                     statusIcon.innerHTML = '<span class="text-xl">✅</span>';
                     startCallBtn.disabled = false;
                     startCallBtn.innerHTML = '<span>🎯</span><span>Start Live Demo Call</span>';
                     startCallBtn.onclick = null;
+                    startCallBtn.type = 'submit';
                     timerDisplay.classList.add('hidden');
                     break;
                     
                 case 'failed':
+                    stopTimer(); // FIXED: Stop timer when failed
+                    statusIcon.classList.remove('status-pulse');
                     statusIcon.classList.add('bg-red-100');
                     statusIcon.innerHTML = '<span class="text-xl">❌</span>';
                     startCallBtn.disabled = false;
+                    startCallBtn.innerHTML = '<span>🎯</span><span>Start Live Demo Call</span>';
+                    startCallBtn.onclick = null;
+                    startCallBtn.type = 'submit';
                     timerDisplay.classList.add('hidden');
                     break;
             }
         }
         
-        function startTimer() {
-            let seconds = 0;
-            timerDisplay.textContent = '00:00';
-            
-            AppState.timerInterval = setInterval(() => {
-                seconds++;
-                timerDisplay.textContent = formatDuration(seconds);
-                
-                // Auto-complete after 5 minutes (300 seconds)
-                if (seconds >= 300) {
-                    markCallComplete();
-                }
-            }, 1000);
-        }
-        
-        function stopTimer() {
-            if (AppState.timerInterval) {
-                clearInterval(AppState.timerInterval);
-                AppState.timerInterval = null;
-            }
-        }
-        
         function markCallComplete() {
-            stopTimer();
+            stopTimer(); // Double ensure timer stops
             
             if (AppState.currentCall) {
                 const duration = timerDisplay.textContent;
@@ -891,14 +911,15 @@
             
             updateStatus('completed', 'Call completed', 'Demo finished successfully');
             showToast('Call marked as complete!', 'success');
-            
-            // Reset button
-            startCallBtn.innerHTML = '<span>🎯</span><span>Start Live Demo Call</span>';
-            startCallBtn.onclick = null;
         }
         
         demoForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Prevent submission if already in progress
+            if (AppState.callStatus === 'in-progress') {
+                return;
+            }
             
             // Get form values
             const businessName = document.getElementById('business-name').value.trim();
@@ -958,7 +979,15 @@
                     })
                 });
                 
-                const data = await response.json();
+                let data;
+                const responseText = await response.text();
+                
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Invalid JSON response:', responseText);
+                    throw new Error('Server returned invalid response');
+                }
                 
                 if (response.ok && data.success) {
                     // Update call with conversation ID
@@ -992,6 +1021,7 @@
             phoneError.classList.add('hidden');
             phoneInput.classList.remove('border-red-500');
             stopTimer();
+            AppState.callStatus = 'ready';
         });
         
         // Call again
@@ -1001,6 +1031,8 @@
                 document.getElementById('phone-number').value = AppState.lastCallData.phoneFormatted;
                 document.getElementById('owner-name').value = AppState.lastCallData.ownerName;
                 statusDisplay.classList.add('hidden');
+                stopTimer();
+                AppState.callStatus = 'ready';
             }
         });
         
@@ -1078,6 +1110,8 @@
             document.getElementById('phone-number').value = phone;
             document.getElementById('owner-name').value = '';
             document.getElementById('status-display').classList.add('hidden');
+            stopTimer();
+            AppState.callStatus = 'ready';
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
         
@@ -1191,6 +1225,7 @@
         document.getElementById('reset-all-btn').addEventListener('click', () => {
             if (confirm('WARNING: This will permanently delete all data and log you out. Are you sure?')) {
                 Storage.clear();
+                stopTimer();
                 showToast('All data cleared. Returning to setup...', 'success');
                 setTimeout(() => {
                     location.reload();
