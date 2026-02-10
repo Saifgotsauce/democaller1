@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVMNT Demo Trigger - Live AI Demo Calls</title>
+    
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            primary: '#FF6B35',
+                            secondary: '#004E89',
+                            light: '#F7931E',
+                        }
+                    },
+                    animation: {
+                        'pulse-ring': 'pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 1s linear infinite',
+                        'slide-in': 'slide-in 0.3s ease-out',
+                        'fade-in': 'fade-in 0.3s ease-out',
+                    },
+                    keyframes: {
+                        'pulse-ring': {
+                            '0%': { transform: 'scale(1)', opacity: '1' },
+                            '100%': { transform: 'scale(1.5)', opacity: '0' },
+                        },
+                        'slide-in': {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        'fade-in': {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
+        /* Status indicator pulse */
+        .status-pulse {
+            position: relative;
+        }
+        .status-pulse::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid #10B981;
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* Gradient button */
+        .btn-gradient {
+            background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+            transition: all 0.2s ease;
+        }
+        .btn-gradient:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px -5px rgba(255, 107, 53, 0.4);
+        }
+        .btn-gradient:disabled {
+            background: #9CA3AF;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        
+        /* Toast notification */
+        .toast {
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        /* Modal overlay */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Card hover effect */
+        .hover-card {
+            transition: all 0.2s ease;
+        }
+        .hover-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        /* Input focus ring */
+        .input-focus:focus {
+            outline: none;
+            border-color: #FF6B35;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+        
+        /* Phone input formatting */
+        .phone-input {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-900">
+    
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50"></div>
+    
+    <!-- SETUP SCREEN (First Time Use) -->
+    <div id="setup-screen" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md animate-slide-in">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-gradient-to-br from-brand-primary to-brand-light rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-3xl">📞</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900">Initial Setup</h1>
+                    <p class="text-gray-500 mt-2">Create your access password to get started</p>
+                </div>
+                
+                <form id="setup-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Create Access Password</label>
+                        <input 
+                            type="password" 
+                            id="setup-password" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                            placeholder="Min 6 characters"
+                            minlength="6"
+                            required
+                        >
+                        <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                        <input 
+                            type="password" 
+                            id="setup-confirm-password" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                            placeholder="Confirm your password"
+                            minlength="6"
+                            required
+                        >
+                    </div>
+                    
+                    <div id="setup-error" class="hidden text-red-500 text-sm"></div>
+                    
+                    <button 
+                        type="submit" 
+                        class="w-full btn-gradient text-white font-semibold py-3 px-6 rounded-lg"
+                    >
+                        Save & Continue
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md animate-slide-in">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-gradient-to-br from-brand-primary to-brand-light rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-3xl">🎯</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900">Demo Trigger Tool</h1>
+                    <p class="text-gray-500 mt-2">Enter your password to access the tool</p>
+                </div>
+                
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Access Password</label>
+                        <input 
+                            type="password" 
+                            id="login-password" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                            placeholder="Enter your password"
+                            required
+                        >
+                    </div>
+                    
+                    <div id="login-error" class="hidden text-red-500 text-sm text-center"></div>
+                    
+                    <button 
+                        type="submit" 
+                        class="w-full btn-gradient text-white font-semibold py-3 px-6 rounded-lg"
+                    >
+                        Access Tool
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard" class="hidden min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 bg-white shadow-sm">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-brand-primary to-brand-light rounded-full flex items-center justify-center">
+                            <span class="text-xl">📞</span>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-gray-900">MVMNT Demo Trigger</h1>
+                            <p class="text-xs text-gray-500">Live AI Demo Calls</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Right side -->
+                    <div class="flex items-center space-x-4">
+                        <!-- API Status -->
+                        <div class="flex items-center space-x-2">
+                            <div class="status-pulse relative">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            </div>
+                            <span class="text-sm text-gray-600 hidden sm:inline">Online</span>
+                        </div>
+                        
+                        <!-- Settings button -->
+                        <button 
+                            id="settings-btn" 
+                            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="space-y-8">
+                
+                <!-- Demo Trigger Card -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover-card">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center space-x-3">
+                            <h2 class="text-xl font-bold text-gray-900">Start Demo Call</h2>
+                            <span class="px-3 py-1 bg-gradient-to-r from-brand-primary to-brand-light text-white text-xs font-medium rounded-full">
+                                ElevenLabs AI Agent
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <form id="demo-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Business Name -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Business Name <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="business-name" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                                    placeholder="ABC HVAC Services"
+                                    required
+                                >
+                            </div>
+                            
+                            <!-- Phone Number -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Phone Number <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="tel" 
+                                    id="phone-number" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors phone-input"
+                                    placeholder="(555) 123-4567"
+                                    maxlength="14"
+                                    required
+                                >
+                                <p id="phone-error" class="hidden text-red-500 text-xs mt-1">Enter a valid 10-digit phone number</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Owner Name -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name (Optional)</label>
+                            <input 
+                                type="text" 
+                                id="owner-name" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                                placeholder="John Smith"
+                            >
+                        </div>
+                        
+                        <!-- Status Display Area -->
+                        <div id="status-display" class="hidden bg-gray-50 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div id="status-icon" class="w-10 h-10 rounded-full flex items-center justify-center">
+                                        <!-- Dynamic icon -->
+                                    </div>
+                                    <div>
+                                        <p id="status-text" class="font-semibold text-gray-900">Ready to call</p>
+                                        <p id="status-subtext" class="text-sm text-gray-500"></p>
+                                    </div>
+                                </div>
+                                <div id="timer-display" class="hidden text-2xl font-mono font-bold text-brand-primary">
+                                    00:00
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button 
+                                type="submit" 
+                                id="start-call-btn"
+                                class="flex-1 btn-gradient text-white font-bold py-4 px-8 rounded-lg text-lg flex items-center justify-center space-x-2"
+                            >
+                                <span>🎯</span>
+                                <span>Start Live Demo Call</span>
+                            </button>
+                            
+                            <button 
+                                type="button" 
+                                id="clear-btn"
+                                class="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        
+                        <!-- Call Again Button (hidden by default) -->
+                        <button 
+                            type="button" 
+                            id="call-again-btn"
+                            class="hidden w-full py-3 border border-brand-primary text-brand-primary font-medium rounded-lg hover:bg-brand-primary hover:text-white transition-colors"
+                        >
+                            📞 Call Last Number Again
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Call Log Section -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-gray-900">Recent Calls</h2>
+                        <div class="flex space-x-2">
+                            <button 
+                                id="export-csv-btn"
+                                class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                <span>Export CSV</span>
+                            </button>
+                            <button 
+                                id="clear-history-btn"
+                                class="px-4 py-2 border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                                Clear History
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Desktop Table View -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Time</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Business Name</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Phone Number</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Duration</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="call-log-table-body">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Mobile Card View -->
+                    <div id="call-log-mobile" class="md:hidden space-y-4">
+                        <!-- Dynamic content -->
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="empty-state" class="text-center py-12">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-3xl">📋</span>
+                        </div>
+                        <p class="text-gray-500">No calls yet. Start your first demo above!</p>
+                    </div>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0" id="settings-overlay"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-in relative">
+                <!-- Close button -->
+                <button 
+                    id="close-settings"
+                    class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                
+                <div class="p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6">Settings</h2>
+                    
+                    <!-- Change Password -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3">Change Access Password</h3>
+                        <form id="change-password-form" class="space-y-3">
+                            <input 
+                                type="password" 
+                                id="current-password" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                                placeholder="Current password"
+                                required
+                            >
+                            <input 
+                                type="password" 
+                                id="new-password" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-colors"
+                                placeholder="New password (min 6 chars)"
+                                minlength="6"
+                                required
+                            >
+                            <button 
+                                type="submit" 
+                                class="w-full py-2 bg-brand-secondary text-white font-medium rounded-lg hover:bg-opacity-90 transition-colors"
+                            >
+                                Update Password
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <hr class="border-gray-200 my-6">
+                    
+                    <!-- Reset Data -->
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-700 mb-3">Danger Zone</h3>
+                        <button 
+                            id="reset-all-btn"
+                            class="w-full py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            <span>Reset All Data & Logout</span>
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">This will permanently delete all call history and logout</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript Application Logic -->
+    <script>
+        // ============================================
+        // APPLICATION STATE
+        // ============================================
+        const AppState = {
+            passwordHash: null,
+            callLog: [],
+            currentCall: null,
+            timerInterval: null,
+            lastCallData: null,
+            callStatus: 'ready' // ready, initiating, calling, in-progress, completed, failed
+        };
+        
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        
+        /**
+         * Generate SHA-256 hash of a string
+         */
+        async function sha256(message) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        
+        /**
+         * Format phone number as user types: (XXX) XXX-XXXX
+         */
+        function formatPhoneNumber(value) {
+            const digits = value.replace(/\D/g, '').substring(0, 10);
+            const parts = [];
+            if (digits.length > 0) parts.push('(' + digits.substring(0, 3));
+            if (digits.length >= 3) parts.push(') ' + digits.substring(3, 6));
+            if (digits.length >= 6) parts.push('-' + digits.substring(6, 10));
+            return parts.join('');
+        }
+        
+        /**
+         * Convert formatted phone to API format: +1XXXXXXXXXX
+         */
+        function toApiPhoneNumber(formatted) {
+            const digits = formatted.replace(/\D/g, '');
+            if (digits.length !== 10) return null;
+            return '+1' + digits;
+        }
+        
+        /**
+         * Format duration as MM:SS
+         */
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+        
+        /**
+         * Format timestamp for display
+         */
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+        
+        /**
+         * Generate unique ID
+         */
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+        
+        // ============================================
+        // LOCALSTORAGE MANAGEMENT
+        // ============================================
+        
+        const Storage = {
+            KEY: 'mvmnt_demo_trigger',
+            
+            load() {
+                try {
+                    const data = localStorage.getItem(this.KEY);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        AppState.passwordHash = parsed.passwordHash || null;
+                        AppState.callLog = parsed.callLog || [];
+                    }
+                } catch (e) {
+                    console.error('Error loading from localStorage:', e);
+                }
+            },
+            
+            save() {
+                try {
+                    const data = {
+                        passwordHash: AppState.passwordHash,
+                        callLog: AppState.callLog.slice(0, 50) // Keep only last 50
+                    };
+                    localStorage.setItem(this.KEY, JSON.stringify(data));
+                } catch (e) {
+                    console.error('Error saving to localStorage:', e);
+                }
+            },
+            
+            clear() {
+                localStorage.removeItem(this.KEY);
+                AppState.passwordHash = null;
+                AppState.callLog = [];
+            }
+        };
+        
+        // ============================================
+        // TOAST NOTIFICATIONS
+        // ============================================
+        
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColor = type === 'success' ? 'bg-green-500' : 
+                           type === 'error' ? 'bg-red-500' : 
+                           type === 'warning' ? 'bg-amber-500' : 'bg-blue-500';
+            
+            const icon = type === 'success' ? '✓' : 
+                        type === 'error' ? '✕' : 
+                        type === 'warning' ? '⚠' : 'ℹ';
+            
+            toast.className = `toast ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 mb-2`;
+            toast.innerHTML = `
+                <span class="font-bold">${icon}</span>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // ============================================
+        // CONFETTI EFFECT
+        // ============================================
+        
+        function triggerConfetti() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.8 },
+                colors: ['#FF6B35', '#F7931E', '#004E89', '#10B981']
+            });
+        }
+        
+        // ============================================
+        // SCREEN NAVIGATION
+        // ============================================
+        
+        function showScreen(screenName) {
+            // Hide all screens
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            
+            // Show requested screen
+            document.getElementById(screenName).classList.remove('hidden');
+        }
+        
+        function checkAuth() {
+            Storage.load();
+            
+            if (!AppState.passwordHash) {
+                showScreen('setup-screen');
+            } else {
+                showScreen('login-screen');
+            }
+        }
+        
+        // ============================================
+        // SETUP FLOW
+        // ============================================
+        
+        document.getElementById('setup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const password = document.getElementById('setup-password').value;
+            const confirmPassword = document.getElementById('setup-confirm-password').value;
+            const errorEl = document.getElementById('setup-error');
+            
+            // Validation
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                errorEl.textContent = 'Passwords do not match';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            // Hash and store
+            AppState.passwordHash = await sha256(password);
+            Storage.save();
+            
+            showToast('Password saved successfully!', 'success');
+            showScreen('dashboard');
+            renderCallLog();
+        });
+        
+        // ============================================
+        // LOGIN FLOW
+        // ============================================
+        
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            
+            const inputHash = await sha256(password);
+            
+            if (inputHash === AppState.passwordHash) {
+                errorEl.classList.add('hidden');
+                document.getElementById('login-password').value = '';
+                showScreen('dashboard');
+                renderCallLog();
+            } else {
+                errorEl.textContent = 'Invalid password. Please try again.';
+                errorEl.classList.remove('hidden');
+            }
+        });
+        
+        // ============================================
+        // PHONE NUMBER FORMATTING
+        // ============================================
+        
+        const phoneInput = document.getElementById('phone-number');
+        const phoneError = document.getElementById('phone-error');
+        
+        phoneInput.addEventListener('input', (e) => {
+            const formatted = formatPhoneNumber(e.target.value);
+            e.target.value = formatted;
+            
+            const digits = formatted.replace(/\D/g, '');
+            if (digits.length === 10) {
+                phoneError.classList.add('hidden');
+                phoneInput.classList.remove('border-red-500');
+            }
+        });
+        
+        phoneInput.addEventListener('blur', () => {
+            const digits = phoneInput.value.replace(/\D/g, '');
+            if (digits.length > 0 && digits.length !== 10) {
+                phoneError.classList.remove('hidden');
+                phoneInput.classList.add('border-red-500');
+            }
+        });
+        
+        // ============================================
+        // DEMO FORM HANDLING
+        // ============================================
+        
+        const demoForm = document.getElementById('demo-form');
+        const startCallBtn = document.getElementById('start-call-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const callAgainBtn = document.getElementById('call-again-btn');
+        const statusDisplay = document.getElementById('status-display');
+        const statusIcon = document.getElementById('status-icon');
+        const statusText = document.getElementById('status-text');
+        const statusSubtext = document.getElementById('status-subtext');
+        const timerDisplay = document.getElementById('timer-display');
+        
+        function updateStatus(state, message, subtext = '') {
+            AppState.callStatus = state;
+            statusDisplay.classList.remove('hidden');
+            statusText.textContent = message;
+            statusSubtext.textContent = subtext;
+            
+            // Update icon based on state
+            statusIcon.className = 'w-10 h-10 rounded-full flex items-center justify-center';
+            
+            switch (state) {
+                case 'initiating':
+                    statusIcon.classList.add('bg-blue-100');
+                    statusIcon.innerHTML = '<div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>';
+                    startCallBtn.disabled = true;
+                    timerDisplay.classList.add('hidden');
+                    break;
+                    
+                case 'calling':
+                    statusIcon.classList.add('bg-blue-100');
+                    statusIcon.innerHTML = '<span class="text-xl">📞</span>';
+                    startCallBtn.disabled = true;
+                    timerDisplay.classList.add('hidden');
+                    break;
+                    
+                case 'in-progress':
+                    statusIcon.classList.add('bg-green-100', 'status-pulse');
+                    statusIcon.innerHTML = '<span class="text-xl">📞</span>';
+                    startCallBtn.disabled = true;
+                    timerDisplay.classList.remove('hidden');
+                    // Change button to "Mark Complete"
+                    startCallBtn.innerHTML = '<span>✓</span><span>Mark Complete</span>';
+                    startCallBtn.onclick = markCallComplete;
+                    startCallBtn.disabled = false;
+                    break;
+                    
+                case 'completed':
+                    statusIcon.classList.add('bg-green-100');
+                    statusIcon.innerHTML = '<span class="text-xl">✅</span>';
+                    startCallBtn.disabled = false;
+                    startCallBtn.innerHTML = '<span>🎯</span><span>Start Live Demo Call</span>';
+                    startCallBtn.onclick = null;
+                    timerDisplay.classList.add('hidden');
+                    break;
+                    
+                case 'failed':
+                    statusIcon.classList.add('bg-red-100');
+                    statusIcon.innerHTML = '<span class="text-xl">❌</span>';
+                    startCallBtn.disabled = false;
+                    timerDisplay.classList.add('hidden');
+                    break;
+            }
+        }
+        
+        function startTimer() {
+            let seconds = 0;
+            timerDisplay.textContent = '00:00';
+            
+            AppState.timerInterval = setInterval(() => {
+                seconds++;
+                timerDisplay.textContent = formatDuration(seconds);
+                
+                // Auto-complete after 5 minutes (300 seconds)
+                if (seconds >= 300) {
+                    markCallComplete();
+                }
+            }, 1000);
+        }
+        
+        function stopTimer() {
+            if (AppState.timerInterval) {
+                clearInterval(AppState.timerInterval);
+                AppState.timerInterval = null;
+            }
+        }
+        
+        function markCallComplete() {
+            stopTimer();
+            
+            if (AppState.currentCall) {
+                const duration = timerDisplay.textContent;
+                AppState.currentCall.status = 'Completed';
+                AppState.currentCall.duration = duration;
+                
+                // Update in call log
+                const logIndex = AppState.callLog.findIndex(c => c.id === AppState.currentCall.id);
+                if (logIndex !== -1) {
+                    AppState.callLog[logIndex] = { ...AppState.currentCall };
+                    Storage.save();
+                    renderCallLog();
+                }
+            }
+            
+            updateStatus('completed', 'Call completed', 'Demo finished successfully');
+            showToast('Call marked as complete!', 'success');
+            
+            // Reset button
+            startCallBtn.innerHTML = '<span>🎯</span><span>Start Live Demo Call</span>';
+            startCallBtn.onclick = null;
+        }
+        
+        demoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get form values
+            const businessName = document.getElementById('business-name').value.trim();
+            const phoneFormatted = document.getElementById('phone-number').value;
+            const ownerName = document.getElementById('owner-name').value.trim();
+            
+            // Validate phone
+            const phoneNumber = toApiPhoneNumber(phoneFormatted);
+            if (!phoneNumber) {
+                phoneError.classList.remove('hidden');
+                phoneInput.classList.add('border-red-500');
+                phoneInput.focus();
+                return;
+            }
+            
+            // Validate business name
+            if (businessName.length < 2) {
+                showToast('Business name must be at least 2 characters', 'error');
+                return;
+            }
+            
+            // Update status
+            updateStatus('initiating', 'Initiating...', 'Connecting to ElevenLabs AI');
+            
+            // Store last call data
+            AppState.lastCallData = { businessName, phoneFormatted, ownerName };
+            callAgainBtn.classList.remove('hidden');
+            
+            // Create call log entry
+            const callEntry = {
+                id: generateId(),
+                timestamp: new Date().toISOString(),
+                business: businessName,
+                phone: phoneFormatted,
+                status: 'In Progress',
+                duration: '-',
+                conversationId: null
+            };
+            
+            AppState.currentCall = callEntry;
+            AppState.callLog.unshift(callEntry);
+            Storage.save();
+            renderCallLog();
+            
+            try {
+                // Call API
+                const response = await fetch('/api/trigger-call', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phone_number: phoneNumber,
+                        business_name: businessName,
+                        owner_name: ownerName,
+                        password_hash: AppState.passwordHash
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Update call with conversation ID
+                    callEntry.conversationId = data.conversation_id;
+                    Storage.save();
+                    
+                    updateStatus('in-progress', 'In Progress', `Calling ${businessName}...`);
+                    startTimer();
+                    triggerConfetti();
+                    showToast(`Demo call started to ${businessName}!`, 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to initiate call');
+                }
+            } catch (error) {
+                console.error('Call error:', error);
+                
+                // Update call log to failed
+                callEntry.status = 'Failed';
+                Storage.save();
+                renderCallLog();
+                
+                updateStatus('failed', 'Failed', error.message);
+                showToast(error.message, 'error');
+            }
+        });
+        
+        // Clear form
+        clearBtn.addEventListener('click', () => {
+            demoForm.reset();
+            statusDisplay.classList.add('hidden');
+            phoneError.classList.add('hidden');
+            phoneInput.classList.remove('border-red-500');
+            stopTimer();
+        });
+        
+        // Call again
+        callAgainBtn.addEventListener('click', () => {
+            if (AppState.lastCallData) {
+                document.getElementById('business-name').value = AppState.lastCallData.businessName;
+                document.getElementById('phone-number').value = AppState.lastCallData.phoneFormatted;
+                document.getElementById('owner-name').value = AppState.lastCallData.ownerName;
+                statusDisplay.classList.add('hidden');
+            }
+        });
+        
+        // ============================================
+        // CALL LOG RENDERING
+        // ============================================
+        
+        function getStatusBadge(status) {
+            const colors = {
+                'Completed': 'bg-green-100 text-green-800',
+                'In Progress': 'bg-blue-100 text-blue-800',
+                'Failed': 'bg-red-100 text-red-800'
+            };
+            return `<span class="px-2 py-1 text-xs font-medium rounded-full ${colors[status] || 'bg-gray-100 text-gray-800'}">${status}</span>`;
+        }
+        
+        function renderCallLog() {
+            const tableBody = document.getElementById('call-log-table-body');
+            const mobileContainer = document.getElementById('call-log-mobile');
+            const emptyState = document.getElementById('empty-state');
+            
+            if (AppState.callLog.length === 0) {
+                emptyState.classList.remove('hidden');
+                tableBody.innerHTML = '';
+                mobileContainer.innerHTML = '';
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            // Desktop table
+            tableBody.innerHTML = AppState.callLog.map(call => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="py-3 px-4 text-sm text-gray-900">${formatTime(call.timestamp)}</td>
+                    <td class="py-3 px-4 text-sm text-gray-900">${escapeHtml(call.business)}</td>
+                    <td class="py-3 px-4 text-sm font-mono text-gray-600">${call.phone}</td>
+                    <td class="py-3 px-4">${getStatusBadge(call.status)}</td>
+                    <td class="py-3 px-4 text-sm text-gray-600">${call.duration}</td>
+                    <td class="py-3 px-4">
+                        <button 
+                            onclick="callAgain('${escapeJs(call.business)}', '${escapeJs(call.phone)}')"
+                            class="text-brand-primary hover:text-brand-light text-sm font-medium"
+                        >
+                            Call Again
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Mobile cards
+            mobileContainer.innerHTML = AppState.callLog.map(call => `
+                <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-500">${formatTime(call.timestamp)}</span>
+                        ${getStatusBadge(call.status)}
+                    </div>
+                    <p class="font-medium text-gray-900">${escapeHtml(call.business)}</p>
+                    <p class="font-mono text-sm text-gray-600">${call.phone}</p>
+                    <div class="flex items-center justify-between pt-2">
+                        <span class="text-sm text-gray-600">Duration: ${call.duration}</span>
+                        <button 
+                            onclick="callAgain('${escapeJs(call.business)}', '${escapeJs(call.phone)}')"
+                            class="text-brand-primary hover:text-brand-light text-sm font-medium"
+                        >
+                            Call Again
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Global function for onclick handlers
+        window.callAgain = function(business, phone) {
+            document.getElementById('business-name').value = business;
+            document.getElementById('phone-number').value = phone;
+            document.getElementById('owner-name').value = '';
+            document.getElementById('status-display').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function escapeJs(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+        
+        // ============================================
+        // EXPORT CSV
+        // ============================================
+        
+        document.getElementById('export-csv-btn').addEventListener('click', () => {
+            if (AppState.callLog.length === 0) {
+                showToast('No calls to export', 'warning');
+                return;
+            }
+            
+            const headers = ['Timestamp', 'Business Name', 'Phone Number', 'Status', 'Duration', 'Conversation ID'];
+            const rows = AppState.callLog.map(call => [
+                call.timestamp,
+                call.business,
+                call.phone,
+                call.status,
+                call.duration,
+                call.conversationId || ''
+            ]);
+            
+            const csv = [headers.join(','), ...rows.map(r => r.map(field => `"${field}"`).join(','))].join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `call-log-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('CSV exported successfully!', 'success');
+        });
+        
+        // ============================================
+        // CLEAR HISTORY
+        // ============================================
+        
+        document.getElementById('clear-history-btn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all call history? This cannot be undone.')) {
+                AppState.callLog = [];
+                Storage.save();
+                renderCallLog();
+                showToast('Call history cleared', 'success');
+            }
+        });
+        
+        // ============================================
+        // SETTINGS MODAL
+        // ============================================
+        
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings');
+        const settingsOverlay = document.getElementById('settings-overlay');
+        
+        function openSettings() {
+            settingsModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeSettings() {
+            settingsModal.classList.add('hidden');
+            document.body.style.overflow = '';
+            // Clear password fields
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+        }
+        
+        settingsBtn.addEventListener('click', openSettings);
+        closeSettingsBtn.addEventListener('click', closeSettings);
+        settingsOverlay.addEventListener('click', closeSettings);
+        
+        // Change password
+        document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            
+            // Verify current password
+            const currentHash = await sha256(currentPassword);
+            if (currentHash !== AppState.passwordHash) {
+                showToast('Current password is incorrect', 'error');
+                return;
+            }
+            
+            // Update password
+            AppState.passwordHash = await sha256(newPassword);
+            Storage.save();
+            
+            showToast('Password updated successfully!', 'success');
+            closeSettings();
+        });
+        
+        // Reset all data
+        document.getElementById('reset-all-btn').addEventListener('click', () => {
+            if (confirm('WARNING: This will permanently delete all data and log you out. Are you sure?')) {
+                Storage.clear();
+                showToast('All data cleared. Returning to setup...', 'success');
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }
+        });
+        
+        // ============================================
+        // INITIALIZE APP
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
+    </script>
+</body>
+</html>
