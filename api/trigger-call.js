@@ -1,5 +1,5 @@
 /**
- * MVMNT Demo Trigger - Serverless Function (Updated for latest ElevenLabs API)
+ * MVMNT Demo Trigger - Serverless Function
  */
 
 const rateLimitStore = new Map();
@@ -72,7 +72,8 @@ module.exports = async (req, res) => {
         const { phone_number, business_name, owner_name, password_hash } = body;
         
         // Validate password
-        if (!password_hash || password_hash.toLowerCase() !== process.env.ACCESS_PASSWORD_HASH?.toLowerCase()) {
+        const expectedHash = process.env.ACCESS_PASSWORD_HASH;
+        if (!password_hash || password_hash.toLowerCase() !== expectedHash?.toLowerCase()) {
             return res.status(401).json({ success: false, error: 'Invalid password' });
         }
         
@@ -88,23 +89,15 @@ module.exports = async (req, res) => {
         if (!business_name || business_name.trim().length < 2) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Business name required (min 2 chars)' 
+                error: 'Business name required' 
             });
         }
         
-        // Call ElevenLabs API (UPDATED ENDPOINT)
+        // Call ElevenLabs API - CORRECT ENDPOINT
         const apiKey = process.env.ELEVENLABS_API_KEY;
         const agentId = process.env.ELEVENLABS_AGENT_ID;
         
-        if (!apiKey || !agentId) {
-            return res.status(500).json({ 
-                success: false, 
-                error: 'Server configuration error' 
-            });
-        }
-        
-        // Updated API endpoint and payload structure
-        const response = await fetch('https://api.elevenlabs.io/v1/convai/conversations', {
+        const response = await fetch('https://api.elevenlabs.io/v1/convai/phone-calls', {
             method: 'POST',
             headers: {
                 'xi-api-key': apiKey,
@@ -113,9 +106,11 @@ module.exports = async (req, res) => {
             body: JSON.stringify({
                 agent_id: agentId,
                 phone_number: phone_number,
-                custom_llm_extra_body: {
-                    business_name: business_name,
-                    owner_name: owner_name || ''
+                conversation_initiation: {
+                    custom_llm_extra_body: {
+                        business_name: business_name,
+                        owner_name: owner_name || ''
+                    }
                 }
             })
         });
@@ -123,20 +118,14 @@ module.exports = async (req, res) => {
         const data = await response.json();
         
         if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('Agent not found. Check if agent is published and phone is enabled.');
-            }
-            if (response.status === 401) {
-                throw new Error('Invalid API key');
-            }
-            throw new Error(data.detail || `ElevenLabs error: ${response.status}`);
+            throw new Error(data.detail || `API error: ${response.status}`);
         }
         
         return res.status(200).json({
             success: true,
             conversation_id: data.conversation_id || data.call_id,
             status: 'initiated',
-            message: `Demo call started to ${business_name}`
+            message: `Call started to ${business_name}`
         });
         
     } catch (error) {
